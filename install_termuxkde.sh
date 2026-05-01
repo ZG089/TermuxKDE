@@ -38,10 +38,10 @@ task_done() {
 # error "Failure label"   (rewrites pending line with [✗], then exits)
 error() {
   if [[ -n "$_task_label" ]]; then
-    printf "\033[2A\r\033[2K${RED}[✗]${RESET} %b${DIM} — run this command for details: cat ~/termuxkde_error.log${RESET}\n\r\033[2K" "$1"
+    printf "\033[2A\r\033[2K${RED}[✗]${RESET} %b${DIM} — cat ~/termuxkde_error.log${RESET}\n\r\033[2K" "$1"
     _task_label=""
   else
-    echo -e "${RED}[✗]${RESET} $1${DIM} — run this command for details: cat ~/termuxkde_error.log${RESET}"
+    echo -e "${RED}[✗]${RESET} $1${DIM} — cat ~/termuxkde_error.log${RESET}"
   fi
   exit 1
 }
@@ -234,22 +234,41 @@ fi
 _task_label=""
 task()      { _task_label="$1"; echo -e "\033[36m[*]\033[0m $1"; echo -e "\033[2m    └─ $2\033[0m"; }
 task_done() { printf "\033[2A\r\033[2K\033[32m[✓]\033[0m %b\n\r\033[2K" "$1"; _task_label=""; }
+error()     {
+  if [[ -n "$_task_label" ]]; then
+    printf "\033[2A\r\033[2K\033[31m[✗]\033[0m %b\033[2m — check output above\033[0m\n\r\033[2K" "$1"
+    _task_label=""
+  else
+    echo -e "\033[31m[✗]\033[0m $1"
+  fi
+  echo -e "\033[2mUninstall may be incomplete. Some steps were skipped.\033[0m"
+  exit 1
+}
 
 task      "Removing launcher scripts"  "Deleting startplasma, stoplasma, TermuxKDE-Remove..."
-rm -f "$HOME/bin/startplasma" "$HOME/bin/stoplasma" "$HOME/bin/TermuxKDE-Remove"
+rm -f "$HOME/bin/startplasma" "$HOME/bin/stoplasma" "$HOME/bin/TermuxKDE-Remove" \
+  || error "Failed to remove launcher scripts"
 task_done "Scripts removed"
 
 task      "Cleaning shell config"  "Stripping TermuxKDE block from ${RC_FILE}..."
-sed -i '/# ── TermuxKDE ──/,+10d' "$RC_FILE" 2>/dev/null
+sed -i '/# ── TermuxKDE ──/,+10d' "$RC_FILE" 2>/dev/null \
+  || error "Failed to clean shell config"
 task_done "Shell config cleaned"
 
 task      "Uninstalling KDE packages"  "Removing plasma, kde-applications, termux-x11-nightly..."
 DEBIAN_FRONTEND=noninteractive yes | pkg uninstall -y \
-  kde-applications plasma termux-x11-nightly > /dev/null 2>&1
+  kde-applications plasma termux-x11-nightly > /dev/null 2>&1 \
+  || error "Failed to uninstall KDE packages"
 task_done "Packages removed"
 
+task      "Removing remaining dependencies"  "Running autoremove to clean up leftover packages..."
+DEBIAN_FRONTEND=noninteractive yes | pkg autoremove > /dev/null 2>&1 \
+  || error "Failed to autoremove packages"
+task_done "Dependencies cleaned up"
+
 task      "Removing log file"  "Deleting termuxkde_error.log..."
-rm -f "$HOME/termuxkde_error.log"
+rm -f "$HOME/termuxkde_error.log" \
+  || error "Failed to remove log file"
 task_done "Log removed"
 
 echo ""
@@ -286,6 +305,15 @@ RCEOF
   # shellcheck disable=SC1090
   source "$RC_FILE" > /dev/null 2>&1
   task_done "Config activated (${SHELL_NAME})"
+}
+
+# ── Cache Cleanup ─────────────────────────────────
+cleanup_cache() {
+  step "Cleanup"
+  task "Cleaning package cache" "Freeing cached package files..."
+  apt-get clean >> "$LOG" 2>&1 \
+    || error "Failed to clean package cache"
+  task_done "Package cache cleared"
 }
 
 # ── Summary ───────────────────────────────────────
@@ -333,6 +361,7 @@ main() {
   install_x11
   install_kde
   setup_aliases
+  cleanup_cache
   show_summary
 }
 
