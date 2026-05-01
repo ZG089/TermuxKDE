@@ -43,7 +43,7 @@
 | 📦 **Termux** | Latest version from [F-Droid](https://f-droid.org/packages/com.termux/) |
 | 🖥️ **Termux:X11** | Install from [GitHub Releases](https://github.com/termux/termux-x11/releases) |
 | 📐 **Terminal size** | Minimum `88x35` (cols x lines) |
-| 💾 **Storage** | ~2 GB free space |
+| 💾 **Storage** | ~5 GB free space |
 | 🌐 **Internet** | Required during installation |
 
 > ⚠️ **Do NOT install Termux from the Play Store** — it's outdated. Use F-Droid.
