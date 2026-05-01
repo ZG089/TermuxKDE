@@ -38,10 +38,10 @@ task_done() {
 # error "Failure label"   (rewrites pending line with [✗], then exits)
 error() {
   if [[ -n "$_task_label" ]]; then
-    printf "\033[2A\r\033[2K${RED}[✗]${RESET} %b${DIM} — cat ~/termuxkde_error.log${RESET}\n\r\033[2K" "$1"
+    printf "\033[2A\r\033[2K${RED}[✗]${RESET} %b${DIM} — Run this command for details: cat ~/termuxkde_error.log${RESET}\n\r\033[2K" "$1"
     _task_label=""
   else
-    echo -e "${RED}[✗]${RESET} $1${DIM} — cat ~/termuxkde_error.log${RESET}"
+    echo -e "${RED}[✗]${RESET} $1${DIM} — Run this command for details: cat ~/termuxkde_error.log${RESET}"
   fi
   exit 1
 }
@@ -175,7 +175,6 @@ install_kde() {
 # ── Setup Scripts, MOTD & Uninstaller ────────────
 setup_aliases() {
   step "Shell Config"
-
   mkdir -p "$HOME/bin"
 
   # ── startplasma ──
@@ -183,7 +182,6 @@ setup_aliases() {
 #!/bin/bash
 nohup termux-x11 -xstartup startplasma-x11 > /dev/null 2>&1 &
 disown
-sleep 2
 echo -e "\033[1m\033[32m[✓] KDE Plasma started\033[0m  \033[2m— stop: stoplasma\033[0m"
 EOF
 
