@@ -16,11 +16,35 @@ BOLD='\033[1m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-info()    { echo -e "${CYAN}[*]${RESET} $1"; }
-detail()  { echo -e "${DIM}    └─ $1${RESET}"; }
-success() { echo -e "${GREEN}[✓]${RESET} $1"; }
-error()   { echo -e "${RED}[✗]${RESET} $1${DIM} — cat ~/termuxkde_error.log${RESET}"; exit 1; }
-step()    { echo -e "\n${BOLD}${CYAN}── $1 ──${RESET}"; }
+_task_label=""
+
+# ── Output helpers ────────────────────────────────
+info()  { echo -e "${CYAN}[*]${RESET} $1"; }
+step()  { echo -e "\n${BOLD}${CYAN}── $1 ──${RESET}"; }
+
+# task "Pending label" "Description shown while running"
+task() {
+  _task_label="$1"
+  echo -e "${CYAN}[*]${RESET} $1"
+  echo -e "${DIM}    └─ $2${RESET}"
+}
+
+# task_done "Completed label"
+task_done() {
+  printf "\033[2A\r\033[2K${GREEN}[✓]${RESET} %b\n\r\033[2K" "$1"
+  _task_label=""
+}
+
+# error "Failure label"   (rewrites pending line with [✗], then exits)
+error() {
+  if [[ -n "$_task_label" ]]; then
+    printf "\033[2A\r\033[2K${RED}[✗]${RESET} %b${DIM} — run this command for details: cat ~/termuxkde_error.log${RESET}\n\r\033[2K" "$1"
+    _task_label=""
+  else
+    echo -e "${RED}[✗]${RESET} $1${DIM} — run this command for details: cat ~/termuxkde_error.log${RESET}"
+  fi
+  exit 1
+}
 
 # ── Terminal Size Check ───────────────────────────
 REQUIRED_COLS=88
@@ -96,43 +120,56 @@ confirm() {
 }
 
 # ── Silent pkg wrapper ────────────────────────────
+# pkg_silent "Pending" "Description" "Done" "Fail" install <pkg>
 pkg_silent() {
-  local desc="$1" explain="$2"; shift 2
-  info "$desc"
-  detail "$explain"
+  local pending="$1" desc="$2" done_label="$3" fail_label="$4"; shift 4
+  task "$pending" "$desc"
   DEBIAN_FRONTEND=noninteractive yes | pkg "$@" \
     -o Dpkg::Options::="--force-confdef" \
     -o Dpkg::Options::="--force-confold" \
-    >> "$LOG" 2>&1 || error "Failed: $desc"
-  success "$desc"
+    >> "$LOG" 2>&1 || error "$fail_label"
+  task_done "$done_label"
 }
 
 # ── Steps ─────────────────────────────────────────
 update_system() {
   step "Update & Upgrade"
-  info "Updating package lists"
-  detail "Fetching latest index from Termux repos..."
-  DEBIAN_FRONTEND=noninteractive yes | pkg update >> "$LOG" 2>&1 || error "Failed: update"
-  success "Package lists updated"
-  info "Upgrading packages"
-  detail "Upgrading all outdated packages..."
+
+  task "Updating package lists" "Fetching latest index from Termux repos..."
+  DEBIAN_FRONTEND=noninteractive yes | pkg update >> "$LOG" 2>&1 \
+    || error "Failed to update package lists"
+  task_done "Package lists updated"
+
+  task "Upgrading packages" "Upgrading all outdated packages..."
   DEBIAN_FRONTEND=noninteractive yes | pkg upgrade \
     -o Dpkg::Options::="--force-confdef" \
     -o Dpkg::Options::="--force-confold" \
-    >> "$LOG" 2>&1 || error "Failed: upgrade"
-  success "Packages upgraded"
+    >> "$LOG" 2>&1 || error "Failed to upgrade packages"
+  task_done "Packages upgraded"
 }
 
 install_x11() {
   step "X11 Setup"
-  pkg_silent "Installing x11-repo"           "Adding Termux X11 package repository..."        install x11-repo
-  pkg_silent "Installing termux-x11-nightly" "Installing X11 display bridge for Termux:X11..." install termux-x11-nightly
+  pkg_silent \
+    "Installing x11-repo"            "Adding Termux X11 package repository..."         \
+    "x11-repo added"                 "Failed to install x11-repo"                      \
+    install x11-repo
+  pkg_silent \
+    "Installing termux-x11-nightly"  "Installing X11 display bridge for Termux:X11..."  \
+    "termux-x11-nightly installed"   "Failed to install termux-x11-nightly"             \
+    install termux-x11-nightly
 }
 
 install_kde() {
   step "KDE Plasma"
-  pkg_silent "Installing Plasma desktop"    "Installing KDE shell, window manager, core components..." install plasma
-  pkg_silent "Installing KDE Applications" "Installing file manager, terminal, text editor..."         install kde-applications
+  pkg_silent \
+    "Installing Plasma desktop"      "Installing KDE shell, window manager, core components..." \
+    "Plasma desktop installed"       "Failed to install Plasma desktop"                         \
+    install plasma
+  pkg_silent \
+    "Installing KDE Applications"    "Installing file manager, terminal, text editor..."        \
+    "KDE Applications installed"     "Failed to install KDE Applications"                       \
+    install kde-applications
 }
 
 # ── Setup Scripts, MOTD & Uninstaller ────────────
@@ -194,22 +231,26 @@ else
   RC_FILE="$HOME/.bashrc"
 fi
 
-echo -e "\033[36m[*]\033[0m Removing launcher scripts..."
+_task_label=""
+task()      { _task_label="$1"; echo -e "\033[36m[*]\033[0m $1"; echo -e "\033[2m    └─ $2\033[0m"; }
+task_done() { printf "\033[2A\r\033[2K\033[32m[✓]\033[0m %b\n\r\033[2K" "$1"; _task_label=""; }
+
+task      "Removing launcher scripts"  "Deleting startplasma, stoplasma, TermuxKDE-Remove..."
 rm -f "$HOME/bin/startplasma" "$HOME/bin/stoplasma" "$HOME/bin/TermuxKDE-Remove"
-echo -e "\033[32m[✓]\033[0m Scripts removed"
+task_done "Scripts removed"
 
-echo -e "\033[36m[*]\033[0m Cleaning shell config..."
+task      "Cleaning shell config"  "Stripping TermuxKDE block from ${RC_FILE}..."
 sed -i '/# ── TermuxKDE ──/,+10d' "$RC_FILE" 2>/dev/null
-echo -e "\033[32m[✓]\033[0m Shell config cleaned"
+task_done "Shell config cleaned"
 
-echo -e "\033[36m[*]\033[0m Uninstalling KDE packages..."
+task      "Uninstalling KDE packages"  "Removing plasma, kde-applications, termux-x11-nightly..."
 DEBIAN_FRONTEND=noninteractive yes | pkg uninstall -y \
   kde-applications plasma termux-x11-nightly > /dev/null 2>&1
-echo -e "\033[32m[✓]\033[0m Packages removed"
+task_done "Packages removed"
 
-echo -e "\033[36m[*]\033[0m Removing log file..."
+task      "Removing log file"  "Deleting termuxkde_error.log..."
 rm -f "$HOME/termuxkde_error.log"
-echo -e "\033[32m[✓]\033[0m Log removed"
+task_done "Log removed"
 
 echo ""
 echo -e "${GREEN}${BOLD}TermuxKDE has been fully removed.${RESET}"
@@ -217,7 +258,7 @@ echo -e "${DIM}Restart Termux to apply changes.${RESET}"
 EOF
 
   chmod +x "$HOME/bin/startplasma" "$HOME/bin/stoplasma" "$HOME/bin/TermuxKDE-Remove"
-  success "Launcher scripts created"
+  echo -e "${GREEN}[✓]${RESET} Launcher scripts created"
 
   # ── Check for duplicate before writing to RC ──
   if grep -q "# ── TermuxKDE ──" "$RC_FILE" 2>/dev/null; then
@@ -238,14 +279,13 @@ echo -e "  ║  \033[0m\033[1m\033[31mTermuxKDE-Remove\033[0m\033[1m\033[36m →
 echo "  ╚══════════════════════════╝"
 echo -e "\033[0m\033[2m  ⚠ TermuxKDE-Remove will delete everything\033[0m"
 RCEOF
-    success "MOTD written to ${RC_FILE}"
+    echo -e "${GREEN}[✓]${RESET} MOTD written to ${RC_FILE}"
   fi
 
-  info "Activating config"
-  detail "Running source on ${RC_FILE}..."
+  task     "Activating config"  "Running source on ${RC_FILE}..."
   # shellcheck disable=SC1090
   source "$RC_FILE" > /dev/null 2>&1
-  success "Config activated (${SHELL_NAME})"
+  task_done "Config activated (${SHELL_NAME})"
 }
 
 # ── Summary ───────────────────────────────────────
