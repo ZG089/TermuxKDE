@@ -65,18 +65,13 @@ If it's too small, **pinch-zoom out** on the Termux keyboard to shrink the font 
 ## ✦ Installation
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/xenoZ0x/TermuxKDE
-cd TermuxKDE
 
-# 2. Give permission
-chmod +x install_termuxkde.sh
-
-# 3. Install ncurses-utils
+# 1. Install ncurses-utils
 apt install ncurses-utils
 
-# 4. Run the installer
-bash install_termuxkde.sh
+# 2. Run the script
+curl -s https://raw.githubusercontent.com/zenoZ0x/TermuxKDE/refs/heads/master/install_termuxkde.sh | bash
+
 ```
 
 The installer handles everything **silently and automatically** — no manual input needed after the initial confirmation.
