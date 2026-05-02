@@ -43,7 +43,7 @@
 | 📦 **Termux** | Latest version from [F-Droid](https://f-droid.org/packages/com.termux/) |
 | 🖥️ **Termux:X11** | Install from [GitHub Releases](https://github.com/termux/termux-x11/releases) |
 | 📐 **Terminal size** | Minimum `88x35` (cols x lines) |
-| 💾 **Storage** | ~2 GB free space |
+| 💾 **Storage** | ~5 GB free space |
 | 🌐 **Internet** | Required during installation |
 
 > ⚠️ **Do NOT install Termux from the Play Store** — it's outdated. Use F-Droid.
@@ -65,15 +65,13 @@ If it's too small, **pinch-zoom out** on the Termux keyboard to shrink the font 
 ## ✦ Installation
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/xenoZ0x/TermuxKDE
-cd TermuxKDE
 
-# 2. Give permission
-chmod +x install_termuxkde.sh
+# 1. Install ncurses-utils
+apt install ncurses-utils
 
-# 3. Run the installer
-bash install_termuxkde.sh
+# 2. Run the script
+curl -s https://raw.githubusercontent.com/zenoZ0x/TermuxKDE/refs/heads/master/install_termuxkde.sh | bash
+
 ```
 
 The installer handles everything **silently and automatically** — no manual input needed after the initial confirmation.
